@@ -32,7 +32,7 @@ struct MapView: View {
     // MARK: - Properties
     
     @ObservedObject var locationManager: LocationManager
-    var modelContext: ModelContext
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \PinData.timestamp, order: .reverse) private var pins: [PinData]
     @State private var showingPinEntry = false
     @State private var selectedCoordinate: CLLocationCoordinate2D?
@@ -116,14 +116,13 @@ struct MapView: View {
                 if let coordinate = selectedCoordinate {
                     PinDataEntryView(
                         isPresented: $showingPinEntry,
-                        coordinate: coordinate,
-                        modelContext: modelContext
+                        coordinate: coordinate
                     )
                 }
             }
             .sheet(isPresented: $showingPinDetail) {
                 if let pin = selectedPin {
-                    PinDetailView(pin: pin, isPresented: $showingPinDetail, modelContext: modelContext)
+                    PinDetailView(pin: pin, isPresented: $showingPinDetail)
                 }
             }
             .alert("Location Access Required", isPresented: $showingLocationAlert) {
@@ -367,9 +366,6 @@ struct PinAnnotationView: View {
     let samplePin = PinData(coordinate: .school, residenceType: .house, answerStatus: .answered, responseType: .positive)
     context.insert(samplePin)
     
-    return MapView(
-        locationManager: LocationManager(),
-        modelContext: context
-    )
-    .modelContainer(container)
+    return MapView(locationManager: LocationManager())
+        .modelContainer(container)
 }

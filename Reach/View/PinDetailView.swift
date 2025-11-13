@@ -2,14 +2,6 @@
 //  PinDetailView.swift
 //  Reach
 //
-//  Created by Paradis d'Abbadon on 12.11.25.
-//
-
-
-//
-//  PinDetailView.swift
-//  Reach
-//
 //  Created for viewing and managing individual pin details
 //
 
@@ -20,7 +12,8 @@ import MapKit
 struct PinDetailView: View {
     let pin: PinData
     @Binding var isPresented: Bool
-    var modelContext: ModelContext
+    
+    @Environment(\.modelContext) private var modelContext
     @State private var showingDeleteConfirmation = false
     @State private var showingEditView = false
     
@@ -243,8 +236,7 @@ struct PinDetailView: View {
     
     return PinDetailView(
         pin: samplePin,
-        isPresented: .constant(true),
-        modelContext: context
+        isPresented: .constant(true)
     )
     .modelContainer(container)
 }

@@ -13,8 +13,9 @@ import SwiftData
 struct PinDataEntryView: View {
     @Binding var isPresented: Bool
     let coordinate: CLLocationCoordinate2D
-    var modelContext: ModelContext
     
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var locationManager = LocationManager()
     @State private var workingLatitude: Double
     @State private var workingLongitude: Double
@@ -24,12 +25,10 @@ struct PinDataEntryView: View {
     @State private var selectedResponseType: ResponseType = .positive
     @State private var notes: String = ""
     @FocusState private var notesFieldFocused: Bool
-    @Environment(\.dismiss) private var dismiss
     
-    init(isPresented: Binding<Bool>, coordinate: CLLocationCoordinate2D, modelContext: ModelContext) {
+    init(isPresented: Binding<Bool>, coordinate: CLLocationCoordinate2D) {
         self._isPresented = isPresented
         self.coordinate = coordinate
-        self.modelContext = modelContext
         self._workingLatitude = State(initialValue: coordinate.latitude)
         self._workingLongitude = State(initialValue: coordinate.longitude)
     }
@@ -223,10 +222,9 @@ struct PinDataEntryView: View {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: PinData.self, configurations: config)
     
-    return PinDataEntryView(
+    PinDataEntryView(
         isPresented: .constant(true),
-        coordinate: CLLocationCoordinate2D(latitude: 37.720663784, longitude: -122.474498102),
-        modelContext: container.mainContext
+        coordinate: CLLocationCoordinate2D(latitude: 37.720663784, longitude: -122.474498102)
     )
     .modelContainer(container)
 }

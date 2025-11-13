@@ -10,12 +10,14 @@ import SwiftData
 
 /// Main content view that manages the app's tab navigation
 struct ContentView: View {
+    // MARK: - Properties
     @StateObject private var authManager = AuthenticationManager()
     @StateObject private var locationManager = LocationManager()
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \PinData.timestamp, order: .reverse) private var pins: [PinData]
     
     var body: some View {
+        // MARK: - Body
         TabView {
             // Dashboard Tab
             DashboardView(authManager: authManager, pins: pins)
@@ -24,7 +26,7 @@ struct ContentView: View {
                 }
             
             // Map Tab
-            MapView(locationManager: locationManager, modelContext: modelContext)
+            MapView(locationManager: locationManager)
                 .tabItem {
                     Label("Map", systemImage: "map.fill")
                 }

@@ -2,10 +2,11 @@
 //  ReachApp.swift
 //  Reach
 //
-//  Created by xCode on 9/10/25.
+//  Updated with SwiftData container
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct ReachApp: App {
@@ -13,5 +14,6 @@ struct ReachApp: App {
         WindowGroup {
             ContentView()
         }
+        .modelContainer(for: PinData.self)
     }
 }

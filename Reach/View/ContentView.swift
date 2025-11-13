@@ -2,16 +2,18 @@
 //  ContentView.swift
 //  Reach
 //
-//  Enhanced following Apple HIG
+//  Enhanced following Apple HIG with SwiftData
 //
 
 import SwiftUI
+import SwiftData
 
 /// Main content view that manages the app's tab navigation
 struct ContentView: View {
     @StateObject private var authManager = AuthenticationManager()
     @StateObject private var locationManager = LocationManager()
-    @State private var pins: [PinData] = []
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \PinData.timestamp, order: .reverse) private var pins: [PinData]
     
     var body: some View {
         TabView {
@@ -22,7 +24,7 @@ struct ContentView: View {
                 }
             
             // Map Tab
-            MapView(pins: $pins, locationManager: locationManager)
+            MapView(locationManager: locationManager, modelContext: modelContext)
                 .tabItem {
                     Label("Map", systemImage: "map.fill")
                 }
@@ -46,4 +48,5 @@ struct ContentView: View {
 // MARK: - Preview
 #Preview {
     ContentView()
+        .modelContainer(for: PinData.self, inMemory: true)
 }

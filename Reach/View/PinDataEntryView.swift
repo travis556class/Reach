@@ -2,17 +2,18 @@
 //  PinDataEntryView.swift
 //  Reach
 //
-//  Enhanced following Apple HIG
+//  Enhanced following Apple HIG with SwiftData
 //
 
 import SwiftUI
 import MapKit
 import CoreLocation
+import SwiftData
 
 struct PinDataEntryView: View {
     @Binding var isPresented: Bool
     let coordinate: CLLocationCoordinate2D
-    let onSave: (PinData) -> Void
+    var modelContext: ModelContext
     
     @StateObject private var locationManager = LocationManager()
     @State private var workingLatitude: Double
@@ -25,10 +26,10 @@ struct PinDataEntryView: View {
     @FocusState private var notesFieldFocused: Bool
     @Environment(\.dismiss) private var dismiss
     
-    init(isPresented: Binding<Bool>, coordinate: CLLocationCoordinate2D, onSave: @escaping (PinData) -> Void) {
+    init(isPresented: Binding<Bool>, coordinate: CLLocationCoordinate2D, modelContext: ModelContext) {
         self._isPresented = isPresented
         self.coordinate = coordinate
-        self.onSave = onSave
+        self.modelContext = modelContext
         self._workingLatitude = State(initialValue: coordinate.latitude)
         self._workingLongitude = State(initialValue: coordinate.longitude)
     }
@@ -195,7 +196,8 @@ struct PinDataEntryView: View {
             responseType: selectedResponseType,
             notes: notes.isEmpty ? nil : notes
         )
-        onSave(pinData)
+        modelContext.insert(pinData)
+        try? modelContext.save()
         dismiss()
     }
     
@@ -218,9 +220,13 @@ struct PinDataEntryView: View {
 }
 
 #Preview {
-    PinDataEntryView(
+    let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(for: PinData.self, configurations: config)
+    
+    return PinDataEntryView(
         isPresented: .constant(true),
         coordinate: CLLocationCoordinate2D(latitude: 37.720663784, longitude: -122.474498102),
-        onSave: { _ in }
+        modelContext: container.mainContext
     )
+    .modelContainer(container)
 }

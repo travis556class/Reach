@@ -2,12 +2,13 @@
 //  MapView.swift
 //  Reach
 //
-//  Enhanced following Apple HIG
+//  Enhanced following Apple HIG with SwiftData
 //
 
 import SwiftUI
 import MapKit
 import UIKit
+import SwiftData
 
 // MARK: - MKCoordinateRegion Extension
 extension MKCoordinateRegion {
@@ -30,13 +31,15 @@ extension CLLocationCoordinate2D {
 struct MapView: View {
     // MARK: - Properties
     
-    @Binding var pins: [PinData]
     @ObservedObject var locationManager: LocationManager
+    var modelContext: ModelContext
+    @Query(sort: \PinData.timestamp, order: .reverse) private var pins: [PinData]
     @State private var showingPinEntry = false
     @State private var selectedCoordinate: CLLocationCoordinate2D?
     @State private var selectedPin: PinData?
     @State private var showingLocationAlert = false
     @State private var showingPinDetail = false
+    @State private var showingDeleteConfirmation = false
     @State private var cameraPosition: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: .school,
@@ -87,7 +90,7 @@ struct MapView: View {
                         Divider()
                         
                         Button(role: .destructive) {
-                            pins.removeAll()
+                            showingDeleteConfirmation = true
                         } label: {
                             Label("Clear All Pins", systemImage: "trash")
                         }
@@ -97,20 +100,30 @@ struct MapView: View {
                     }
                 }
             }
+            .confirmationDialog(
+                "Clear All Pins",
+                isPresented: $showingDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete All Pins", role: .destructive) {
+                    deleteAllPins()
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("This will permanently delete all \(pins.count) pins. This action cannot be undone.")
+            }
             .sheet(isPresented: $showingPinEntry) {
                 if let coordinate = selectedCoordinate {
                     PinDataEntryView(
                         isPresented: $showingPinEntry,
                         coordinate: coordinate,
-                        onSave: { pinData in
-                            pins.append(pinData)
-                        }
+                        modelContext: modelContext
                     )
                 }
             }
             .sheet(isPresented: $showingPinDetail) {
                 if let pin = selectedPin {
-                    PinDetailView(pin: pin, isPresented: $showingPinDetail)
+                    PinDetailView(pin: pin, isPresented: $showingPinDetail, modelContext: modelContext)
                 }
             }
             .alert("Location Access Required", isPresented: $showingLocationAlert) {
@@ -285,6 +298,13 @@ struct MapView: View {
             )
         }
     }
+    
+    private func deleteAllPins() {
+        for pin in pins {
+            modelContext.delete(pin)
+        }
+        try? modelContext.save()
+    }
 }
 
 // MARK: - Supporting Views
@@ -337,59 +357,19 @@ struct PinAnnotationView: View {
     }
 }
 
-struct PinDetailView: View {
-    let pin: PinData
-    @Binding var isPresented: Bool
-    
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    LabeledContent("Residence Type", value: pin.residenceType.rawValue)
-                    LabeledContent("Status", value: pin.answerStatus.rawValue)
-                    if pin.answerStatus == .answered {
-                        LabeledContent("Response", value: pin.responseType.rawValue)
-                    }
-                }
-                
-                Section("Location") {
-                    LabeledContent("Latitude", value: String(format: "%.6f", pin.latitude))
-                    LabeledContent("Longitude", value: String(format: "%.6f", pin.longitude))
-                }
-                
-                Section("Details") {
-                    LabeledContent("Date", value: pin.timestamp.formatted(date: .abbreviated, time: .shortened))
-                    
-                    if let notes = pin.notes, !notes.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Notes")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            Text(notes)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Pin Details")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        isPresented = false
-                    }
-                    .fontWeight(.semibold)
-                }
-            }
-        }
-    }
-}
-
 // MARK: - Preview
 #Preview {
-    MapView(
-        pins: .constant([
-            PinData(coordinate: .school, residenceType: .house, answerStatus: .answered, responseType: .positive)
-        ]),
-        locationManager: LocationManager()
+    let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(for: PinData.self, configurations: config)
+    let context = container.mainContext
+    
+    // Add sample data
+    let samplePin = PinData(coordinate: .school, residenceType: .house, answerStatus: .answered, responseType: .positive)
+    context.insert(samplePin)
+    
+    return MapView(
+        locationManager: LocationManager(),
+        modelContext: context
     )
+    .modelContainer(container)
 }

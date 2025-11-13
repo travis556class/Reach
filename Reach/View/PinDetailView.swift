@@ -2,6 +2,14 @@
 //  PinDetailView.swift
 //  Reach
 //
+//  Created by Paradis d'Abbadon on 12.11.25.
+//
+
+
+//
+//  PinDetailView.swift
+//  Reach
+//
 //  Created for viewing and managing individual pin details
 //
 

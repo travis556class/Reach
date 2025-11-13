@@ -2,7 +2,7 @@
 //  PinDataEntryView.swift
 //  Reach
 //
-//  Created by xCode on 9/10/25.
+//  Enhanced following Apple HIG
 //
 
 import SwiftUI
@@ -15,106 +15,131 @@ struct PinDataEntryView: View {
     let onSave: (PinData) -> Void
     
     @StateObject private var locationManager = LocationManager()
-    @State private var workingLatitude: Double = 0
-    @State private var workingLongitude: Double = 0
+    @State private var workingLatitude: Double
+    @State private var workingLongitude: Double
     @State private var awaitingLocationUpdate = false
     @State private var selectedResidenceType: ResidenceType = .house
     @State private var selectedAnswerStatus: AnswerStatus = .answered
     @State private var selectedResponseType: ResponseType = .positive
     @State private var notes: String = ""
+    @FocusState private var notesFieldFocused: Bool
+    @Environment(\.dismiss) private var dismiss
+    
+    init(isPresented: Binding<Bool>, coordinate: CLLocationCoordinate2D, onSave: @escaping (PinData) -> Void) {
+        self._isPresented = isPresented
+        self.coordinate = coordinate
+        self.onSave = onSave
+        self._workingLatitude = State(initialValue: coordinate.latitude)
+        self._workingLongitude = State(initialValue: coordinate.longitude)
+    }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
-                Section(header: Text("Location")) {
+                Section {
                     HStack {
-                        Text("Latitude:")
+                        Text("Latitude")
+                            .foregroundStyle(.secondary)
                         Spacer()
                         Text(String(format: "%.6f", workingLatitude))
-                            .foregroundColor(.secondary)
+                            .monospacedDigit()
                     }
+                    
                     HStack {
-                        Text("Longitude:")
+                        Text("Longitude")
+                            .foregroundStyle(.secondary)
                         Spacer()
                         Text(String(format: "%.6f", workingLongitude))
-                            .foregroundColor(.secondary)
+                            .monospacedDigit()
                     }
-                    HStack {
-                        Button("Use Current Location"){
-                            switch locationManager.authorizationStatus {
-                            case .notDetermined:
-                                awaitingLocationUpdate = true
-                                locationManager.requestPermission()
-                            case .authorizedWhenInUse, .authorizedAlways:
-                                if let loc = locationManager.location {
-                                    workingLatitude = loc.latitude
-                                    workingLongitude = loc.longitude
-                                } else {
-                                    awaitingLocationUpdate = true
-                                    locationManager.requestLocation()
-                                }
-                            case .denied, .restricted:
-                                // No permission; do nothing here (MapView handles alert). Optionally guide user.
-                                break
-                            @unknown default:
-                                break
-                            }
+                    
+                    Button {
+                        updateToCurrentLocation()
+                    } label: {
+                        HStack {
+                            Image(systemName: "location.fill")
+                            Text("Use Current Location")
+                        }
+                    }
+                    .disabled(awaitingLocationUpdate)
+                } header: {
+                    Text("Location")
+                } footer: {
+                    if awaitingLocationUpdate {
+                        HStack {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Getting location...")
+                                .font(.caption)
                         }
                     }
                 }
                 
-                Section(header: Text("Residence Information")) {
-                    Picker("Residence Type", selection: $selectedResidenceType) {
+                Section("Residence Information") {
+                    Picker("Type", selection: $selectedResidenceType) {
                         ForEach(ResidenceType.allCases, id: \.self) { type in
-                            Text(type.rawValue).tag(type)
+                            HStack {
+                                Image(systemName: iconFor(residenceType: type))
+                                Text(type.rawValue)
+                            }
+                            .tag(type)
                         }
                     }
-                    .pickerStyle(MenuPickerStyle())
                 }
                 
-                Section(header: Text("Contact Information")) {
+                Section("Contact Information") {
                     Picker("Answer Status", selection: $selectedAnswerStatus) {
                         ForEach(AnswerStatus.allCases, id: \.self) { status in
                             Text(status.rawValue).tag(status)
                         }
                     }
-                    .pickerStyle(SegmentedPickerStyle())
+                    .pickerStyle(.segmented)
                     
-                    Picker("Response Type", selection: $selectedResponseType) {
-                        ForEach(ResponseType.allCases, id: \.self) { type in
-                            Text(type.rawValue).tag(type)
+                    if selectedAnswerStatus == .answered {
+                        Picker("Response", selection: $selectedResponseType) {
+                            ForEach(ResponseType.allCases, id: \.self) { type in
+                                Label(type.rawValue, systemImage: iconFor(responseType: type))
+                                    .tag(type)
+                            }
                         }
+                        .pickerStyle(.segmented)
                     }
-                    .pickerStyle(SegmentedPickerStyle())
                 }
                 
-                Section(header: Text("Notes")) {
-                    TextField("Additional notes (optional)", text: $notes, axis: .vertical)
-                        .lineLimit(3...6)
+                Section {
+                    TextField("Additional details (optional)", text: $notes, axis: .vertical)
+                        .lineLimit(3...8)
+                        .focused($notesFieldFocused)
+                } header: {
+                    Text("Notes")
+                } footer: {
+                    Text("Add any relevant information about the visit")
                 }
             }
             .navigationTitle("Add Pin")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        isPresented = false
+                        dismiss()
                     }
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        let pinData = PinData(
-                            coordinate: CLLocationCoordinate2D(latitude: workingLatitude, longitude: workingLongitude),
-                            residenceType: selectedResidenceType,
-                            answerStatus: selectedAnswerStatus,
-                            responseType: selectedResponseType,
-                            notes: notes.isEmpty ? nil : notes
-                        )
-                        onSave(pinData)
-                        isPresented = false
+                        savePin()
                     }
                     .fontWeight(.semibold)
+                }
+                
+                ToolbarItem(placement: .keyboard) {
+                    HStack {
+                        Spacer()
+                        Button("Done") {
+                            notesFieldFocused = false
+                        }
+                        .fontWeight(.semibold)
+                    }
                 }
             }
             .onAppear {
@@ -122,18 +147,72 @@ struct PinDataEntryView: View {
                 workingLatitude = coordinate.latitude
                 workingLongitude = coordinate.longitude
             }
-            .onChange(of: locationManager.location?.latitude) {
-                guard awaitingLocationUpdate, let loc = locationManager.location else { return }
-                workingLatitude = loc.latitude
-                workingLongitude = loc.longitude
-                awaitingLocationUpdate = false
+            .onChange(of: locationManager.location?.latitude) { oldValue, newValue in
+                guard awaitingLocationUpdate,
+                      let latitude = newValue,
+                      let longitude = locationManager.location?.longitude else { return }
+                withAnimation {
+                    workingLatitude = latitude
+                    workingLongitude = longitude
+                    awaitingLocationUpdate = false
+                }
             }
-            .onChange(of: locationManager.location?.longitude) {
-                guard awaitingLocationUpdate, let loc = locationManager.location else { return }
-                workingLatitude = loc.latitude
-                workingLongitude = loc.longitude
-                awaitingLocationUpdate = false
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func updateToCurrentLocation() {
+        switch locationManager.authorizationStatus {
+        case .notDetermined:
+            awaitingLocationUpdate = true
+            locationManager.requestPermission()
+        case .authorizedWhenInUse, .authorizedAlways:
+            if let location = locationManager.location {
+                withAnimation {
+                    workingLatitude = location.latitude
+                    workingLongitude = location.longitude
+                }
+            } else {
+                awaitingLocationUpdate = true
+                locationManager.requestLocation()
             }
+        case .denied, .restricted:
+            break
+        @unknown default:
+            break
+        }
+    }
+    
+    private func savePin() {
+        let pinData = PinData(
+            coordinate: CLLocationCoordinate2D(
+                latitude: workingLatitude,
+                longitude: workingLongitude
+            ),
+            residenceType: selectedResidenceType,
+            answerStatus: selectedAnswerStatus,
+            responseType: selectedResponseType,
+            notes: notes.isEmpty ? nil : notes
+        )
+        onSave(pinData)
+        dismiss()
+    }
+    
+    private func iconFor(residenceType: ResidenceType) -> String {
+        switch residenceType {
+        case .house: return "house.fill"
+        case .apartment: return "building.2.fill"
+        case .hotel: return "bed.double.fill"
+        case .duplex: return "building.fill"
+        case .other: return "mappin.circle"
+        }
+    }
+    
+    private func iconFor(responseType: ResponseType) -> String {
+        switch responseType {
+        case .positive: return "hand.thumbsup.fill"
+        case .negative: return "hand.thumbsdown.fill"
         }
     }
 }
@@ -145,4 +224,3 @@ struct PinDataEntryView: View {
         onSave: { _ in }
     )
 }
-
